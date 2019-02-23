@@ -239,8 +239,23 @@ namespace WSDKTest
                     //    bitmap.Dispose();
                     //}
 
+                    var altitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAltitudeAsync();
+                    loop_info += "height: " + altitude_result.value.Value.value + "\n";
+
                     var attitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAttitudeAsync();
-                    loop_info = "attitude: "+attitude_result.ToString();
+                    if (attitude_result.value == null)
+                    {
+                        loop_info += "attitude: " + "null" + "\n";
+                    } else
+                    {
+                        loop_info += "roll: " + attitude_result.value.Value.roll + "\n";
+                        loop_info += "pitch: " + attitude_result.value.Value.pitch + "\n";
+                        loop_info += "yaw: " + attitude_result.value.Value.yaw + "\n";
+                    }
+
+                    var flying = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetIsFlyingAsync();
+                    loop_info += "flying: " + flying.value.Value.value+"\n";
+
 
                     // finish processing
                     watch.Stop();
