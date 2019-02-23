@@ -24,6 +24,7 @@ using Microsoft.Graphics.Canvas.Effects;
 using DJIDemo.Controls;
 using WSDKTest.Controls;
 using System.Linq;
+using OpenCvSharp;
 
 namespace WSDKTest
 {
@@ -114,6 +115,63 @@ namespace WSDKTest
             string fileName = DateTime.Now.ToString("MM-dd-yyy-h-mm-tt") + ".csv";
             Windows.Storage.StorageFile newFile = await Windows.Storage.DownloadsFolder.CreateFileAsync(fileName);
             await Windows.Storage.FileIO.WriteTextAsync(newFile, csv.ToString());
+        }
+
+        // detect green lines from image
+        public List<double> getGreenLines(Mat img, int threshold, bool takeTopCluster)
+        {
+            var lowerBound = new OpenCvSharp.Scalar(40, 25, 25);
+            var upperBound = new OpenCvSharp.Scalar(80, 255, 255);
+            var hsv = img.CvtColor(ColorConversionCodes.BGR2HSV);
+            var mask = hsv.InRange(lowerBound, upperBound);
+            var invertMask = (255 - mask).ToMat();
+            var canny = invertMask.Canny(50, 150, 3);
+            var lines = Cv2.HoughLines(canny, 1, Math.PI / 180, 200);
+
+            double max_c = int.MinValue;
+            double min_c = int.MaxValue;
+            double mean_rho = 0;
+            double mean_theta = 0;
+
+            for(int i = 0; i < lines.Length; i++)
+            {
+                var rho = lines[i].Rho;
+                var theta = lines[i].Theta;
+                var c = rho / Math.Sin(theta);
+                max_c = Math.Max(max_c, c);
+                min_c = Math.Min(min_c, c);
+                mean_rho += rho;
+                mean_theta += theta;
+            }
+
+            if (max_c - min_c > threshold)
+            {
+                mean_rho = 0;
+                mean_theta = 0;
+                var mid_c = (max_c + min_c) / 2;
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var rho = lines[i].Rho;
+                    var theta = lines[i].Theta;
+                    var c = rho / Math.Sin(theta);
+
+                    if(c > mid_c && takeTopCluster)
+                    {
+                        mean_rho += rho;
+                        mean_theta += theta;
+                    }
+                    else if(c < mid_c && !takeTopCluster)
+                    {
+                        mean_rho += rho;
+                        mean_theta += theta;
+                    }
+                }
+
+            }
+            mean_rho = mean_rho / lines.Length;
+            mean_theta = mean_theta / lines.Length;
+
+            return new List<double>(new double[] { mean_rho, mean_theta });
         }
 
         void createWorker()
