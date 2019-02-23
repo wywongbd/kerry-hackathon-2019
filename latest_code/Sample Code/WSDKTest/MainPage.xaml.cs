@@ -22,6 +22,8 @@ using Windows.Storage.Streams;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Effects;
 using DJIDemo.Controls;
+using WSDKTest.Controls;
+using System.Linq;
 
 namespace WSDKTest
 {
@@ -101,6 +103,19 @@ namespace WSDKTest
             return reader.decodeMultiple(new BinaryBitmap(binarizer));
         }
 
+        // save matched pairs to a csv files
+        public async void WriteToCsv(Dictionary<string, string> data)
+        {
+            String csv = String.Join(
+                Environment.NewLine,
+                data.Select(d => d.Key + "," + d.Value + ";")
+            );
+
+            string fileName = DateTime.Now.ToString("MM-dd-yyy-h-mm-tt") + ".csv";
+            Windows.Storage.StorageFile newFile = await Windows.Storage.DownloadsFolder.CreateFileAsync(fileName);
+            await Windows.Storage.FileIO.WriteTextAsync(newFile, csv.ToString());
+        }
+
         void createWorker()
         {
             //create worker thread for reading barcode
@@ -144,7 +159,6 @@ namespace WSDKTest
                         }
                     });
 
-
                     // search for qr code
                     try
                     {
@@ -165,15 +179,17 @@ namespace WSDKTest
                         //var results = reader.decodeMultiple(new BinaryBitmap(binarizer), decodeHints);
                         if (results != null && results.Length > 0)
                         {
-                            //// distinguish location and non location result.
-                            //foreach (var result in results)
-                            //{
-                            //    if(ProcessQRCode.IsLocation(result.Text)) {
-                            //}
+                            // distinguish location and non location result.
+                            foreach (var result in results)
+                            {
+                                if (ProcessQRCode.IsLocation(result.Text))
+                                {
+                                }
+                            }
 
-                            // if there are any non location qr code, use distance to match which location associated with it
+                                // if there are any non location qr code, use distance to match which location associated with it
 
-                            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                             {
                                 foreach (var result in results)
                                 {
