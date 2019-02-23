@@ -85,6 +85,10 @@ namespace WSDKTest
             processWithONNX = new ProcessWithONNX();
             qrCodeReader = new QRCodeMultiReader();
             decodeHints.Add(DecodeHintType.TRY_HARDER, true);
+            var tempDict = new Dictionary<string, string>();
+            tempDict["abc"] = "efg";
+            tempDict["123"] = "456";
+            WriteToCsv(tempDict);
         }
 
         void OnVideoPush(VideoFeed sender, [ReadOnlyArray] ref byte[] bytes)
@@ -108,7 +112,7 @@ namespace WSDKTest
         {
             String csv = String.Join(
                 Environment.NewLine,
-                data.Select(d => d.Key + "," + d.Value + ";")
+                data.Select(d => d.Key + "," + d.Value)
             );
 
             string fileName = DateTime.Now.ToString("MM-dd-yyy-h-mm-tt") + ".csv";
@@ -179,13 +183,14 @@ namespace WSDKTest
                         //var results = reader.decodeMultiple(new BinaryBitmap(binarizer), decodeHints);
                         if (results != null && results.Length > 0)
                         {
-                            // distinguish location and non location result.
-                            foreach (var result in results)
-                            {
-                                if (ProcessQRCode.IsLocation(result.Text))
-                                {
-                                }
-                            }
+                            //// distinguish location and non location result.
+                            //foreach (var result in results)
+                            //{
+                            //    if (ProcessQRCode.IsLocation(result.Text))
+                            //    {
+                            //        matchedPairs.ContainsKey()
+                            //    }
+                            //}
 
                                 // if there are any non location qr code, use distance to match which location associated with it
 
