@@ -38,6 +38,7 @@ namespace WSDKTest
         //As reading barcode is computationally expensive
         private Task readerWorker = null;
         public ISet<string> readed = new HashSet<string>();
+        public ISet<string> matched = new HashSet<string>();
 
         private object bufLock = new object();
         //these properties are guarded by bufLock
@@ -120,6 +121,25 @@ namespace WSDKTest
             await Windows.Storage.FileIO.WriteTextAsync(newFile, csv.ToString());
         }
 
+        private float ManhattanDistance((float, float) p1, (float, float) p2)
+        {
+            return Math.Abs(p1.Item1 - p2.Item1) + Math.Abs(p1.Item2 - p2.Item2);
+        }
+
+        private (float, float) FindCentroid(Result r)
+        {
+            float x = 0;
+            float y = 0;
+            foreach (var p in r.ResultPoints)
+            {
+                x += p.X;
+                y += p.Y;
+            }
+            x /= r.ResultPoints.Length;
+            y /= r.ResultPoints.Length;
+            return (x, y);
+        }
+
         void createWorker()
         {
             //create worker thread for reading barcode
@@ -181,20 +201,69 @@ namespace WSDKTest
                         binarizer = new HybridBinarizer(source);
                         var results = reader.decodeMultiple(new BinaryBitmap(binarizer));
                         //var results = reader.decodeMultiple(new BinaryBitmap(binarizer), decodeHints);
-                        if (results != null && results.Length > 0)
-                        {
-                            //// distinguish location and non location result.
-                            //foreach (var result in results)
-                            //{
-                            //    if (ProcessQRCode.IsLocation(result.Text))
-                            //    {
-                            //        matchedPairs.ContainsKey()
-                            //    }
-                            //}
+                        //if (results != null && results.Length > 0)
+                        //{
+                        //    // only cache unmatched location and box
+                        //    List<(string, (float, float))> location_list = new List<(string, (float, float))>();
+                        //    List<(string, (float, float))> box_list = new List<(string, (float, float))>();
 
-                                // if there are any non location qr code, use distance to match which location associated with it
+                        //    // distinguish location and non location result.
+                        //    foreach (var result in results)
+                        //    {
+                        //        // unmatched location or box
+                        //        if (!matched.Contains(result.Text))
+                        //        {
+                        //            // cache for later computation
+                        //            if (ProcessQRCode.IsLocation(result.Text))
+                        //            {
+                        //                location_list.Add((result.Text, FindCentroid(result)));
+                        //            }
+                        //            else
+                        //            {
+                        //                box_list.Add((result.Text, FindCentroid(result)));
+                        //            }
+                        //        }
+                        //    }
 
-                                await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                        //    // make sure all location are put into the matchedpairs
+                        //    foreach (var loc in location_list)
+                        //    {
+                        //        // all locations are unmatched
+                        //        // which means i can simply set their value to be null.
+                        //        // set null for now. will update later
+                        //        matchedPairs[loc.Item1] = null;
+                        //    }
+
+                        //    if (location_list.Count > 0)
+                        //    {
+                        //        foreach (var box in box_list)
+                        //        {
+                        //            var valid_locations = new List<(string, (float, float))>();
+
+
+
+                        //            (float, float) box_p = box.Item2;
+                        //            string closestLocation = location_list[0].Item1;
+                        //            float shortestDistance = ManhattanDistance(box_p, location_list[0].Item2);
+
+                        //            // find the closest location to the given box
+                        //            foreach (var loc in location_list)
+                        //            {
+                        //                (float, float) loc_p = loc.Item2;
+                        //                var dis = ManhattanDistance(box_p, loc_p);
+                        //                if (dis < shortestDistance)
+                        //                {
+                        //                    closestLocation = loc.Item1;
+                        //                    shortestDistance = dis;
+                        //                }
+                        //            }
+                        //        }
+                        //    }
+
+
+                            // if there are any non location qr code, use distance to match which location associated with it
+
+                            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
                             {
                                 foreach (var result in results)
                                 {
