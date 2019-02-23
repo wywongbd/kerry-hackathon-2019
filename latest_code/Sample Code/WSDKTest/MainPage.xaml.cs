@@ -86,10 +86,6 @@ namespace WSDKTest
             processWithONNX = new ProcessWithONNX();
             qrCodeReader = new QRCodeMultiReader();
             decodeHints.Add(DecodeHintType.TRY_HARDER, true);
-            var tempDict = new Dictionary<string, string>();
-            tempDict["abc"] = "efg";
-            tempDict["123"] = "456";
-            WriteToCsv(tempDict);
         }
 
         void OnVideoPush(VideoFeed sender, [ReadOnlyArray] ref byte[] bytes)
@@ -121,6 +117,16 @@ namespace WSDKTest
             await Windows.Storage.FileIO.WriteTextAsync(newFile, csv.ToString());
         }
 
+        private string PrintPairDictionary()
+        {
+            var pairing = "";
+            foreach (KeyValuePair<string, string> entry in matchedPairs)
+            {
+                pairing += entry.Key + "," + entry.Value + "\n";
+            }
+            return pairing;
+        }
+
         private float ManhattanDistance((float, float) p1, (float, float) p2)
         {
             return Math.Abs(p1.Item1 - p2.Item1) + Math.Abs(p1.Item2 - p2.Item2);
@@ -138,7 +144,7 @@ namespace WSDKTest
             x /= r.ResultPoints.Length;
             y /= r.ResultPoints.Length;
             return (x, y);
-        }
+        }   
 
         void createWorker()
         {
@@ -199,82 +205,114 @@ namespace WSDKTest
                         
                         var source = new SoftwareBitmapLuminanceSource(bitmap);
                         binarizer = new HybridBinarizer(source);
-                        var results = reader.decodeMultiple(new BinaryBitmap(binarizer));
-                        //var results = reader.decodeMultiple(new BinaryBitmap(binarizer), decodeHints);
-                        //if (results != null && results.Length > 0)
-                        //{
-                        //    // only cache unmatched location and box
-                        //    List<(string, (float, float))> location_list = new List<(string, (float, float))>();
-                        //    List<(string, (float, float))> box_list = new List<(string, (float, float))>();
+                        //var results = reader.decodeMultiple(new BinaryBitmap(binarizer));
+                        var results = reader.decodeMultiple(new BinaryBitmap(binarizer), decodeHints);
+                        if (results != null && results.Length > 0)
+                        {
+                            // only cache unmatched location and box
+                            List<(string, (float, float))> location_list = new List<(string, (float, float))>();
+                            List<(string, (float, float))> box_list = new List<(string, (float, float))>();
 
-                        //    // distinguish location and non location result.
-                        //    foreach (var result in results)
-                        //    {
-                        //        // unmatched location or box
-                        //        if (!matched.Contains(result.Text))
-                        //        {
-                        //            // cache for later computation
-                        //            if (ProcessQRCode.IsLocation(result.Text))
-                        //            {
-                        //                location_list.Add((result.Text, FindCentroid(result)));
-                        //            }
-                        //            else
-                        //            {
-                        //                box_list.Add((result.Text, FindCentroid(result)));
-                        //            }
-                        //        }
-                        //    }
-
-                        //    // make sure all location are put into the matchedpairs
-                        //    foreach (var loc in location_list)
-                        //    {
-                        //        // all locations are unmatched
-                        //        // which means i can simply set their value to be null.
-                        //        // set null for now. will update later
-                        //        matchedPairs[loc.Item1] = null;
-                        //    }
-
-                        //    if (location_list.Count > 0)
-                        //    {
-                        //        foreach (var box in box_list)
-                        //        {
-                        //            var valid_locations = new List<(string, (float, float))>();
-
-
-
-                        //            (float, float) box_p = box.Item2;
-                        //            string closestLocation = location_list[0].Item1;
-                        //            float shortestDistance = ManhattanDistance(box_p, location_list[0].Item2);
-
-                        //            // find the closest location to the given box
-                        //            foreach (var loc in location_list)
-                        //            {
-                        //                (float, float) loc_p = loc.Item2;
-                        //                var dis = ManhattanDistance(box_p, loc_p);
-                        //                if (dis < shortestDistance)
-                        //                {
-                        //                    closestLocation = loc.Item1;
-                        //                    shortestDistance = dis;
-                        //                }
-                        //            }
-                        //        }
-                        //    }
-
-
-                            // if there are any non location qr code, use distance to match which location associated with it
-
-                            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                            // distinguish location and non location result.
+                            foreach (var result in results)
                             {
-                                foreach (var result in results)
+                                // unmatched location or box
+                                if (!matched.Contains(result.Text))
                                 {
-                                    if (!readed.Contains(result.Text))
+                                    // cache for later computation
+                                    if (ProcessQRCode.IsLocation(result.Text))
                                     {
-                                        readed.Add(result.Text);
-                                        //Textbox.Text += result.Text + "\n";
+                                        location_list.Add((result.Text, FindCentroid(result)));
+                                    }
+                                    else
+                                    {
+                                        box_list.Add((result.Text, FindCentroid(result)));
                                     }
                                 }
-                            });
+                            }
+
+                            loop_info += "box: \n";
+                            foreach (var box in box_list)
+                            {
+                                loop_info += box.Item1 + "\n";
+                            }
+
+                            loop_info += "loc: \n";
+                            foreach (var loc in location_list)
+                            {
+                                loop_info += loc.Item1 + "\n";
+                            }
+
+                            // make sure all location are put into the matchedpairs
+                            foreach (var loc in location_list)
+                            {
+                                // all locations are unmatched
+                                // which means i can simply set their value to be null.
+                                // set null for now. will update later
+                                matchedPairs[loc.Item1] = "";
+                            }
+
+                            if (location_list.Count > 0)
+                            {
+
+                                List<(string, string, float)> box_loc_dist_list = new List<(string, string, float)>();
+                                foreach (var box in box_list)
+                                {
+                                    var valid_locations = new List<(string, (float, float))>();
+                                    (float, float) box_p = box.Item2;
+
+                                    foreach (var loc in location_list)
+                                    {
+                                        //loop_info += "y " + loc.Item2.Item2 +", "+ box.Item2.Item2 + "\n";
+                                        if (loc.Item2.Item2 > box.Item2.Item2) {
+                                            valid_locations.Add(loc);
+                                        }
+                                    }
+
+                                    foreach (var loc in valid_locations)
+                                    {
+                                        (float, float) loc_p = loc.Item2;
+                                        var dist = ManhattanDistance(box_p, loc_p);
+
+                                        box_loc_dist_list.Add((box.Item1, loc.Item1, dist));
+                                    }
+                                }
+
+                                box_loc_dist_list.Sort((x, y) => x.Item3.CompareTo(x.Item3));
+
+                                int boxCount = 0;
+                                foreach(var box_loc_dist in box_loc_dist_list)
+                                {
+                                    loop_info += box_loc_dist.ToString()+"\n";
+                                    if (!matched.Contains(box_loc_dist.Item1) && !matched.Contains(box_loc_dist.Item2)) {
+                                        matched.Add(box_loc_dist.Item1);
+                                        matched.Add(box_loc_dist.Item2);
+                                        matchedPairs[box_loc_dist.Item2] = box_loc_dist.Item1;
+                                        boxCount += 1;
+                                        if (boxCount == box_list.Count) {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+
+                            //// if there are any non location qr code, use distance to match which location associated with it
+                            //await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                            //{
+                            //    foreach (var result in results)
+                            //    {
+                            //        if (!readed.Contains(result.Text))
+                            //        {
+                            //            readed.Add(result.Text);
+                            //            //Textbox.Text += result.Text + "\n";
+                            //        }
+                            //    }
+                            //});
                         }
+
+                        loop_info += "pairing: \n";
+                        loop_info += PrintPairDictionary();
                     }
                     catch (Exception e)
                     {
@@ -330,7 +368,13 @@ namespace WSDKTest
                     //}
 
                     var altitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAltitudeAsync();
-                    loop_info += "height: " + altitude_result.value.Value.value + "\n";
+                    if (altitude_result.value == null)
+                    {
+                        loop_info += "height: " + "null" + "\n";
+                    } else
+                    {
+                        loop_info += "height: " + altitude_result.value.Value.value + "\n";
+                    }
 
                     var attitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAttitudeAsync();
                     if (attitude_result.value == null)
@@ -344,7 +388,14 @@ namespace WSDKTest
                     }
 
                     var flying = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetIsFlyingAsync();
-                    loop_info += "flying: " + flying.value.Value.value+"\n";
+                    if (flying.value == null)
+                    {
+                        loop_info += "flying: " + "null" + "\n";
+                    }
+                    else
+                    {
+                        loop_info += "flying: " + flying.value.Value.value + "\n";
+                    }
 
 
                     // finish processing
