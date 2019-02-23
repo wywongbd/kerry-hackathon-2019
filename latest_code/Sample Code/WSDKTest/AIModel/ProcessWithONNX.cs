@@ -87,123 +87,123 @@ namespace DJIDemo.AIModel
             string resultText = "";
             resultText += "result count: "+outputlist.Count+"\n";
             return resultText;
-            //uint pixelWidth = (uint)bitmap.PixelWidth;
-            //uint pixelHeight = (uint)bitmap.PixelHeight;
-            try
-            {
-                await mainPage.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
-                {
-                    var overlayCanvas = mainPage.GetCanvas();
+            ////uint pixelWidth = (uint)bitmap.PixelWidth;
+            ////uint pixelHeight = (uint)bitmap.PixelHeight;
+            //try
+            //{
+            //    await mainPage.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
+            //    {
+            //        var overlayCanvas = mainPage.GetCanvas();
 
-                    var VideoActualWidth = (uint)mainPage.GetWidth();
-                    var VideoActualHeight = (uint)mainPage.GetHeight();
+            //        var VideoActualWidth = (uint)mainPage.GetWidth();
+            //        var VideoActualHeight = (uint)mainPage.GetHeight();
 
 
-                    overlayCanvas.Children.Clear();
+            //        overlayCanvas.Children.Clear();
                     
-                    foreach (var output in outputlist)
-                    {
+            //        foreach (var output in outputlist)
+            //        {
 
-                        var box = output.BoundingBox;
+            //            var box = output.BoundingBox;
 
                        
-                        double x = (double)Math.Max(box.Left, 0);
-                        double y = (double)Math.Max(box.Top, 0);
-                        double w = (double)Math.Min(1 - x, box.Width);
-                        double h = (double)Math.Min(1 - y, box.Height);
+            //            double x = (double)Math.Max(box.Left, 0);
+            //            double y = (double)Math.Max(box.Top, 0);
+            //            double w = (double)Math.Min(1 - x, box.Width);
+            //            double h = (double)Math.Min(1 - y, box.Height);
 
-                        var bitmap4barcode = await GetCroppedBitmapAsync(originalBitmap, (uint)(x * originalBitmap.PixelWidth),
-                                                                                (uint)(y * originalBitmap.PixelHeight),
-                                                                                (uint)(w * originalBitmap.PixelWidth),
-                                                                                (uint)(h * originalBitmap.PixelHeight));
-                        var result = mainPage.DecodeQRCode(bitmap4barcode);
+            //            var bitmap4barcode = await GetCroppedBitmapAsync(originalBitmap, (uint)(x * originalBitmap.PixelWidth),
+            //                                                                    (uint)(y * originalBitmap.PixelHeight),
+            //                                                                    (uint)(w * originalBitmap.PixelWidth),
+            //                                                                    (uint)(h * originalBitmap.PixelHeight));
+            //            var result = mainPage.DecodeQRCode(bitmap4barcode);
 
-                        var resultLen = result.Length;
-                        var locationNum = 0;
-                        string locationID = null;
-                        string boxID = null;
-                        if (result != null && resultLen > 0)
-                        {
-                            foreach (var r in result)
-                            {
-                                if (IsLocation(r.Text))
-                                {
-                                    locationID = r.Text;
-                                    locationNum++;
-                                } else
-                                {
-                                    boxID = r.Text;
-                                }
+            //            var resultLen = result.Length;
+            //            var locationNum = 0;
+            //            string locationID = null;
+            //            string boxID = null;
+            //            if (result != null && resultLen > 0)
+            //            {
+            //                foreach (var r in result)
+            //                {
+            //                    if (IsLocation(r.Text))
+            //                    {
+            //                        locationID = r.Text;
+            //                        locationNum++;
+            //                    } else
+            //                    {
+            //                        boxID = r.Text;
+            //                    }
                                 
-                            }
-                            if (locationNum == 1 && resultLen == 2) // one location and one box
-                            {
-                                mainPage.matchedPairs[locationID] = boxID;
-                                resultText += ("Location: " + locationID + ", " + "Box: " + boxID + "\n");
-                            } else if (locationNum == resultLen) // all locations
-                            {
-                                foreach(var r in result)
-                                {
-                                    mainPage.matchedPairs[r.Text] = null;
-                                }
-                            }
-                        }
-                        //var barcodeoutput = await processWithBarcode.ProcessSoftwareBitmap(bitmap4barcode, Mainpage);
+            //                }
+            //                if (locationNum == 1 && resultLen == 2) // one location and one box
+            //                {
+            //                    mainPage.matchedPairs[locationID] = boxID;
+            //                    resultText += ("Location: " + locationID + ", " + "Box: " + boxID + "\n");
+            //                } else if (locationNum == resultLen) // all locations
+            //                {
+            //                    foreach(var r in result)
+            //                    {
+            //                        mainPage.matchedPairs[r.Text] = null;
+            //                    }
+            //                }
+            //            }
+            //            //var barcodeoutput = await processWithBarcode.ProcessSoftwareBitmap(bitmap4barcode, Mainpage);
 
-                        bitmap4barcode.Dispose();
+            //            bitmap4barcode.Dispose();
 
-                        //string boxTest = output.TagName;
+            //            //string boxTest = output.TagName;
 
-                        //x = VideoActualWidth * x;
-                        //y = VideoActualHeight * y;
-                        //w = VideoActualWidth * w;
-                        //h = VideoActualHeight * h;
+            //            //x = VideoActualWidth * x;
+            //            //y = VideoActualHeight * y;
+            //            //w = VideoActualWidth * w;
+            //            //h = VideoActualHeight * h;
                         
-                        //var rectStroke = boxTest == "person"? _lineBrushGreen: _lineBrushRed;
+            //            //var rectStroke = boxTest == "person"? _lineBrushGreen: _lineBrushRed;
 
-                        //var r = new Windows.UI.Xaml.Shapes.Rectangle
-                        //{
-                        //    Tag = box,
-                        //    Width = w,
-                        //    Height = h,
-                        //    Fill = _fillBrush,
-                        //    Stroke = rectStroke,
-                        //    StrokeThickness = _lineThickness,
-                        //    Margin = new Thickness(x, y, 0, 0)
-                        //};
+            //            //var r = new Windows.UI.Xaml.Shapes.Rectangle
+            //            //{
+            //            //    Tag = box,
+            //            //    Width = w,
+            //            //    Height = h,
+            //            //    Fill = _fillBrush,
+            //            //    Stroke = rectStroke,
+            //            //    StrokeThickness = _lineThickness,
+            //            //    Margin = new Thickness(x, y, 0, 0)
+            //            //};
 
 
 
-                        //var tb = new TextBlock
-                        //{
-                        //    Margin = new Thickness(x + 4, y + 4, 0, 0),
-                        //    Text = $"{boxTest} ({Math.Round(output.Probability, 4)})",
-                        //    FontWeight = FontWeights.Bold,
-                        //    Width = 126,
-                        //    Height = 21,
-                        //    HorizontalTextAlignment = TextAlignment.Center
-                        //};
+            //            //var tb = new TextBlock
+            //            //{
+            //            //    Margin = new Thickness(x + 4, y + 4, 0, 0),
+            //            //    Text = $"{boxTest} ({Math.Round(output.Probability, 4)})",
+            //            //    FontWeight = FontWeights.Bold,
+            //            //    Width = 126,
+            //            //    Height = 21,
+            //            //    HorizontalTextAlignment = TextAlignment.Center
+            //            //};
 
-                        //var textBack = new Windows.UI.Xaml.Shapes.Rectangle
-                        //{
-                        //    Width = 134,
-                        //    Height = 29,
-                        //    Fill = rectStroke,
-                        //    Margin = new Thickness(x, y, 0, 0)
-                        //};
+            //            //var textBack = new Windows.UI.Xaml.Shapes.Rectangle
+            //            //{
+            //            //    Width = 134,
+            //            //    Height = 29,
+            //            //    Fill = rectStroke,
+            //            //    Margin = new Thickness(x, y, 0, 0)
+            //            //};
 
-                        //overlayCanvas.Children.Add(textBack);
-                        //overlayCanvas.Children.Add(tb);
-                        //overlayCanvas.Children.Add(r);
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                mainPage.ShowMessagePopup(ex.Message);
+            //            //overlayCanvas.Children.Add(textBack);
+            //            //overlayCanvas.Children.Add(tb);
+            //            //overlayCanvas.Children.Add(r);
+            //        }
+            //    });
+            //}
+            //catch (Exception ex)
+            //{
+            //    mainPage.ShowMessagePopup(ex.Message);
 
-            }
-            return resultText;
+            //}
+            //return resultText;
         }
 
         public bool IsLocation(string str)

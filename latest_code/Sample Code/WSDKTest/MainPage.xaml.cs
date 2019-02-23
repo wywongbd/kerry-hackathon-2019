@@ -30,7 +30,10 @@ namespace WSDKTest
 {
     public sealed partial class MainPage : Page
     {
-        public Dictionary<string, string> matchedPairs = new Dictionary<string, string>();
+        public Dictionary<string, Dictionary<string, float>> boxToLocations = new Dictionary<string, Dictionary<string, float>>();
+        public Dictionary<string, float> boxToMinDist = new Dictionary<string, float>();
+        public Dictionary<string, string> boxToClosestLocation = new Dictionary<string, string>();
+        public ISet<string> seenLocations = new HashSet<string>();
         private IDictionary<DecodeHintType, object> decodeHints = new Dictionary<DecodeHintType, object>();
         private DJIVideoParser.Parser videoParser;
         public WriteableBitmap VideoSource;
@@ -38,8 +41,6 @@ namespace WSDKTest
         //Worker task (thread) for reading barcode
         //As reading barcode is computationally expensive
         private Task readerWorker = null;
-        public ISet<string> readed = new HashSet<string>();
-        public ISet<string> matched = new HashSet<string>();
 
         private object bufLock = new object();
         //these properties are guarded by bufLock
@@ -118,12 +119,29 @@ namespace WSDKTest
             await Windows.Storage.FileIO.WriteTextAsync(newFile, csv.ToString());
         }
 
+        private Dictionary<string, string> GetResultPairs()
+        {
+            var locationToBox = boxToClosestLocation.ToDictionary(x => x.Value, x => x.Key);
+            Dictionary<string, string> pairs = new Dictionary<string, string>();
+            foreach(var loc in seenLocations)
+            {
+                if (locationToBox.ContainsKey(loc))
+                {
+                    pairs[loc] = locationToBox[loc];
+                } else
+                {
+                    pairs[loc] = "";
+                }
+            }
+            return pairs;
+        }
+
         private string PrintPairDictionary()
         {
             var pairing = "";
-            foreach (KeyValuePair<string, string> entry in matchedPairs)
+            foreach (KeyValuePair<string, string> entry in boxToClosestLocation)
             {
-                pairing += entry.Key + "," + entry.Value + "\n";
+                pairing += entry.Value + "," + entry.Key + "\n";
             }
             return pairing;
         }
@@ -215,9 +233,13 @@ namespace WSDKTest
                 SoftwareBitmap bitmap;
                 SoftwareBitmap sbp = null;
                 HybridBinarizer binarizer;
+
+                // control loop
                 while (true)
                 {
                     watch.Restart();
+
+                    // for logging the information of this loop
                     string loop_info = "";
 
                     // display frame
@@ -225,7 +247,6 @@ namespace WSDKTest
                     {
                         try
                         {
-
                             //dispatch to UI thread to do UI update (image)
                             //WriteableBitmap is exclusive to UI thread
                             if (VideoSource == null || VideoSource.PixelWidth != width || VideoSource.PixelHeight != height)
@@ -265,27 +286,25 @@ namespace WSDKTest
                         binarizer = new HybridBinarizer(source);
                         //var results = reader.decodeMultiple(new BinaryBitmap(binarizer));
                         var results = reader.decodeMultiple(new BinaryBitmap(binarizer), decodeHints);
+
+                        // when the qr code detection result is not empty.
                         if (results != null && results.Length > 0)
                         {
-                            // only cache unmatched location and box
+                            // cache locations and boxes
                             List<(string, (float, float))> location_list = new List<(string, (float, float))>();
                             List<(string, (float, float))> box_list = new List<(string, (float, float))>();
 
                             // distinguish location and non location result.
                             foreach (var result in results)
                             {
-                                // unmatched location or box
-                                if (!matched.Contains(result.Text))
+                                // cache for later computation
+                                if (ProcessQRCode.IsLocation(result.Text))
                                 {
-                                    // cache for later computation
-                                    if (ProcessQRCode.IsLocation(result.Text))
-                                    {
-                                        location_list.Add((result.Text, FindCentroid(result)));
-                                    }
-                                    else
-                                    {
-                                        box_list.Add((result.Text, FindCentroid(result)));
-                                    }
+                                    location_list.Add((result.Text, FindCentroid(result)));
+                                }
+                                else
+                                {
+                                    box_list.Add((result.Text, FindCentroid(result)));
                                 }
                             }
 
@@ -301,54 +320,60 @@ namespace WSDKTest
                             //    loop_info += loc.Item1 + "\n";
                             //}
 
-                            // make sure all location are put into the matchedpairs
+                            // make sure all locations are saved somewhere
                             foreach (var loc in location_list)
                             {
-                                // all locations are unmatched
-                                // which means i can simply set their value to be null.
-                                // set null for now. will update later
-                                matchedPairs[loc.Item1] = "";
+                                seenLocations.Add(loc.Item1);
                             }
 
                             if (location_list.Count > 0)
                             {
 
-                                List<(string, string, float)> box_loc_dist_list = new List<(string, string, float)>();
+                                //List<(string, string, float)> box_loc_dist_list = new List<(string, string, float)>();
                                 foreach (var box in box_list)
                                 {
-                                    var valid_locations = new List<(string, (float, float))>();
+                                    // box coordinate
                                     (float, float) box_p = box.Item2;
 
+                                    // locations that are below the box coordinate
+                                    var valid_locations = new List<(string, (float, float))>();
                                     foreach (var loc in location_list)
                                     {
-                                        //loop_info += "y " + loc.Item2.Item2 +", "+ box.Item2.Item2 + "\n";
                                         if (loc.Item2.Item2 > box.Item2.Item2) {
                                             valid_locations.Add(loc);
                                         }
                                     }
+                                    
 
                                     foreach (var loc in valid_locations)
                                     {
                                         (float, float) loc_p = loc.Item2;
                                         var dist = ManhattanDistance(box_p, loc_p);
+                                        if (!boxToLocations.ContainsKey(box.Item1))
+                                        {
+                                            boxToLocations[box.Item1] = new Dictionary<string, float>();
+                                            boxToMinDist[box.Item1] = dist;
+                                            boxToClosestLocation[box.Item1] = loc.Item1;
+                                        }
 
-                                        box_loc_dist_list.Add((box.Item1, loc.Item1, dist));
-                                    }
-                                }
+                                        // update box to location distance
+                                        if (!boxToLocations[box.Item1].ContainsKey(loc.Item1))
+                                        {
+                                            boxToLocations[box.Item1][loc.Item1] = dist;
+                                        } else
+                                        {
+                                            var temp_dist = boxToLocations[box.Item1][loc.Item1];
+                                            if (dist < temp_dist)
+                                            {
+                                                boxToLocations[box.Item1][loc.Item1] = dist;
+                                            }
+                                        }
 
-                                box_loc_dist_list.Sort((x, y) => x.Item3.CompareTo(x.Item3));
-
-                                int boxCount = 0;
-                                foreach(var box_loc_dist in box_loc_dist_list)
-                                {
-                                    loop_info += box_loc_dist.ToString()+"\n";
-                                    if (!matched.Contains(box_loc_dist.Item1) && !matched.Contains(box_loc_dist.Item2)) {
-                                        matched.Add(box_loc_dist.Item1);
-                                        matched.Add(box_loc_dist.Item2);
-                                        matchedPairs[box_loc_dist.Item2] = box_loc_dist.Item1;
-                                        boxCount += 1;
-                                        if (boxCount == box_list.Count) {
-                                            break;
+                                        // when the box to location distance is the shortest
+                                        if (dist < boxToMinDist[box.Item1])
+                                        {
+                                            boxToMinDist[box.Item1] = dist;
+                                            boxToClosestLocation[box.Item1] = loc.Item1;
                                         }
                                     }
                                 }
@@ -727,6 +752,7 @@ namespace WSDKTest
                 case Windows.System.VirtualKey.H:
                     {
                         var res = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).StartAutoLandingAsync();
+                        WriteToCsv(GetResultPairs());
                         break;
                     }
                 case Windows.System.VirtualKey.N:
@@ -796,16 +822,18 @@ namespace WSDKTest
                     }
                 case Windows.System.VirtualKey.J:
                     {
-                        roll -= 0.05f;
-                        if (roll < -0.5f)
-                            roll = -0.5f;
+                        roll = -0.5f;
+                        //roll -= 0.05f;
+                        //if (roll < -0.1f)
+                        //    roll = -0.1f;
                         break;
                     }
                 case Windows.System.VirtualKey.L:
                     {
-                        roll += 0.05f;
-                        if (roll > 0.5)
-                            roll = 0.5f;
+                        roll = 0.5f;
+                        //roll += 0.05f;
+                        //if (roll > 0.1)
+                        //    roll = 0.1f;
                         break;
                     }
                 case Windows.System.VirtualKey.Number0:
