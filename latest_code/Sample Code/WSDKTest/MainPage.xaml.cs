@@ -41,6 +41,7 @@ namespace WSDKTest
         //Worker task (thread) for reading barcode
         //As reading barcode is computationally expensive
         private Task readerWorker = null;
+        private Task controlWorker = null;
 
         private object bufLock = new object();
         //these properties are guarded by bufLock
@@ -109,19 +110,36 @@ namespace WSDKTest
         // save matched pairs to a csv files
         public async void WriteToCsv(Dictionary<string, string> data)
         {
+            if (data == null)
+            {
+                return;
+            }
+            if (data.Count == 0)
+            {
+                return;
+            }
             String csv = String.Join(
                 Environment.NewLine,
                 data.Select(d => d.Key + "," + d.Value)
             );
 
-            string fileName = DateTime.Now.ToString("MM-dd-yyy-h-mm-tt") + ".csv";
+            string fileName = DateTime.Now.ToString("MM-dd-yyy-h-mm-ss") + ".csv";
             Windows.Storage.StorageFile newFile = await Windows.Storage.DownloadsFolder.CreateFileAsync(fileName);
             await Windows.Storage.FileIO.WriteTextAsync(newFile, csv.ToString());
         }
 
         private Dictionary<string, string> GetResultPairs()
         {
-            var locationToBox = boxToClosestLocation.ToDictionary(x => x.Value, x => x.Key);
+
+            var locationToBox = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, string> entry in boxToClosestLocation)
+            {
+                if (!locationToBox.ContainsKey(entry.Value))
+                {
+                    locationToBox[entry.Value] = entry.Key;
+                }
+            }
+
             Dictionary<string, string> pairs = new Dictionary<string, string>();
             foreach(var loc in seenLocations)
             {
@@ -151,6 +169,32 @@ namespace WSDKTest
             return Math.Abs(p1.Item1 - p2.Item1) + Math.Abs(p1.Item2 - p2.Item2);
         }
 
+        private float L2Distance((float, float) p1, (float, float) p2)
+        {
+            var dx = p1.Item1 - p2.Item1;
+            var dy = p1.Item2 - p2.Item2;
+            return (float)Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        private float AverageLengthInOneQRCode(Result r)
+        {
+            var points = r.ResultPoints;
+            float l1 = L2Distance((points[0].X, points[0].Y), (points[1].X, points[1].Y));
+            float l2 = L2Distance((points[1].X, points[1].Y), (points[2].X, points[2].Y));
+            float l3 = L2Distance((points[0].X, points[0].Y), (points[2].X, points[2].Y));
+            return (l1 + l2 + l3) / 3;
+        }
+
+        private float QRCodeAverageLength(Result[] result_lis)
+        {
+            float average_len = 0;
+            foreach (var r in result_lis)
+            {
+                average_len += AverageLengthInOneQRCode(r);
+            }
+            return average_len/result_lis.Length;
+        }
+
         private (float, float) FindCentroid(Result r)
         {
             float x = 0;
@@ -163,7 +207,7 @@ namespace WSDKTest
             x /= r.ResultPoints.Length;
             y /= r.ResultPoints.Length;
             return (x, y);
-        }   
+        }
 
         // detect green lines from image
         public List<double> getGreenLines(Mat img, int threshold, bool takeTopCluster)
@@ -220,6 +264,378 @@ namespace WSDKTest
             mean_theta = mean_theta / lines.Length;
 
             return new List<double>(new double[] { mean_rho, mean_theta });
+        }
+
+        private async Task<double> GetAltitude()
+        {
+            var altitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAltitudeAsync();
+            if (altitude_result.value == null)
+            {
+                return 0;
+            }
+            else
+            {
+                return altitude_result.value.Value.value;
+            }
+        }
+
+        private async Task<double> GetAttitude()
+        {
+            var attitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAttitudeAsync();
+            if (attitude_result.value == null)
+            {
+                return 0;
+            }
+            else
+            {
+                return attitude_result.value.Value.yaw;
+            }
+        }
+
+        private async Task MoveDroneToRight()
+        {
+            var counter = 0;
+            start_tracking_end = true;
+            await Task.Delay(100);
+            while (!is_end && counter < 5 * 7)
+            {
+                MoveRight(0.5f);
+                await Task.Delay(1500);
+                Stop();
+                await Task.Delay(2000);
+                counter++;
+
+                if (qr_len < 60 && qr_len > 45)
+                {
+                    continue;
+                }
+                else if (qr_len >= 60)
+                {
+                    MoveBackward(0.3f);
+                    await Task.Delay(500);
+                }
+                else
+                {
+                    MoveForward(0.3f);
+                    await Task.Delay(500);
+                }
+            }
+            Stop();
+        }
+
+        private async Task MoveDroneToLeft()
+        {
+            var counter = 0;
+            start_tracking_end = true;
+            await Task.Delay(100);
+            while (!is_end && counter < 5 * 7)
+            {
+                MoveLeft(0.5f);
+                await Task.Delay(1500);
+                Stop();
+                await Task.Delay(2000);
+                counter++;
+
+                if (qr_len < 60 && qr_len > 45)
+                {
+                    continue;
+                }
+                else if (qr_len >= 60)
+                {
+                    MoveBackward(0.3f);
+                    await Task.Delay(500);
+                }
+                else
+                {
+                    MoveForward(0.3f);
+                    await Task.Delay(500);
+                }
+            }
+            Stop();
+        }
+        
+        private async Task MoveDroneToLeftLower()
+        {
+            var counter = 0;
+            start_tracking_end = true;
+            await Task.Delay(100);
+            while (!is_end && counter < 5 * 7)
+            {
+                MoveLeft(0.5f);
+                await Task.Delay(1500);
+                Stop();
+                await Task.Delay(2000);
+                counter++;
+
+                var inner_counter = 0;
+                while (!(qr_len < 50 && qr_len > 45) && inner_counter < 6)
+                {
+                    if (qr_len >= 50)
+                    {
+                        MoveBackward(0.3f);
+                        await Task.Delay(50);
+                    }
+                    else
+                    {
+                        MoveForward(0.3f);
+                        await Task.Delay(50);
+                    }
+                    inner_counter++;
+                }
+
+                //if (qr_len < 50 && qr_len > 45)
+                //{
+                //    continue;
+                //}
+                //else if (qr_len >= 50)
+                //{
+                //    MoveBackward(0.3f);
+                //    await Task.Delay(500);
+                //}
+                //else
+                //{
+                //    MoveForward(0.3f);
+                //    await Task.Delay(500);
+                //}
+            }
+            Stop();
+        }
+
+
+        private async Task MoveDroneToRightLower()
+        {
+            var counter = 0;
+            start_tracking_end = true;
+            await Task.Delay(100);
+            while (!is_end && counter < 5 * 7)
+            {
+                MoveRight(0.5f);
+                await Task.Delay(1500);
+                Stop();
+                await Task.Delay(2000);
+                counter++;
+
+                var inner_counter = 0;
+                while(!(qr_len < 50 && qr_len > 45) && inner_counter < 6)
+                {
+                    if (qr_len >= 50)
+                    {
+                        MoveBackward(0.3f);
+                        await Task.Delay(50);
+                    }
+                    else
+                    {
+                        MoveForward(0.3f);
+                        await Task.Delay(50);
+                    }
+                    inner_counter++;
+                }
+                //if (qr_len < 50 && qr_len > 45)
+                //{
+                //    continue;
+                //}
+                //else if (qr_len >= 50)
+                //{
+                //    MoveBackward(0.3f);
+                //    await Task.Delay(500);
+                //}
+                //else
+                //{
+                //    MoveForward(0.3f);
+                //    await Task.Delay(500);
+                //}
+            }
+            Stop();
+        }
+
+        int turn_ms = 2000;
+
+        private float qr_len = 0;
+        private bool is_end = false;
+        private bool start_tracking_end = false;
+        void createControlWorker()
+        {
+            //create worker thread for reading barcode
+            controlWorker = new Task(async () =>
+            {
+                TakeOff();
+
+                //// successfully take off
+                //var altitude = await GetAltitude();
+                //while (altitude < 1.1)
+                //{
+                //    await Task.Delay(100);
+                //    altitude = await GetAltitude();
+                //}
+                //await Task.Delay(500);
+                
+                //// move forward a bit until ...
+                //var counter = 0;
+                //while (true)
+                //{
+                //    if ((qr_len < 60 && qr_len > 45) || counter>=100)
+                //    {
+                //        break;
+                //    }
+                //    else if (qr_len >= 60)
+                //    {
+                //        MoveBackward(0.2f);
+                //        await Task.Delay(20);
+                //    }
+                //    else
+                //    {
+                //        MoveForward(0.2f);
+                //        await Task.Delay(20);
+                //    }
+                //    counter++;
+                //}
+                //Stop();
+
+                //// move to right level 3
+                //await MoveDroneToRight();
+
+                //// move down to level 2
+                //start_tracking_end = false;
+                //is_end = false;
+                //MoveDown();
+                //altitude = await GetAltitude();
+                //while (altitude > 0.8)
+                //{
+                //    await Task.Delay(20);
+                //    altitude = await GetAltitude();
+                //}
+                //Stop();
+
+                //// move to left level 2
+                //await MoveDroneToLeft();
+
+                //// move down to level 1
+                //start_tracking_end = false;
+                //is_end = false;
+                //MoveDown();
+                //altitude = await GetAltitude();
+                //while (altitude >= 0.5)
+                //{
+                //    await Task.Delay(20);
+                //    altitude = await GetAltitude();
+                //}
+                //await Task.Delay(500);
+                //Stop();
+
+
+                //// move backward a bit until?
+                //counter = 0;
+                //while (true)
+                //{
+                //    if ((qr_len < 50 && qr_len > 45) || counter >= 100)
+                //    {
+                //        break;
+                //    }
+                //    else if (qr_len >= 50)
+                //    {
+                //        MoveBackward(0.2f);
+                //        await Task.Delay(50);
+                //    }
+                //    else
+                //    {
+                //        MoveForward(0.2f);
+                //        await Task.Delay(50);
+                //    }
+                //    counter++;
+                //}
+                //Stop();
+
+                //// move to right level 1
+                //await MoveDroneToRight();
+
+
+                // rotate 180 degree
+                TurnRight();
+                await Task.Delay(turn_ms);
+                //var yaw = await GetAttitude();
+                //while (!(yaw < 10 && yaw > 2))
+                //{
+                //    await Task.Delay(10);
+                //    yaw = await GetAttitude();
+                //}
+                Stop();
+                await Task.Delay(100);
+
+                //// move forward a bit until ...
+                //qr_len = 0;
+                //counter = 0;
+                //while (true)
+                //{
+                //    if ((qr_len < 60 && qr_len > 45) || counter >= 130)
+                //    {
+                //        break;
+                //    }
+                //    else if (qr_len >= 60)
+                //    {
+                //        MoveBackward(0.2f);
+                //        await Task.Delay(20);
+                //    }
+                //    else
+                //    {
+                //        MoveForward(0.2f);
+                //        await Task.Delay(20);
+                //    }
+                //    counter++;
+                //}
+                //Stop();
+
+                //// move to right level 1
+                //await MoveDroneToRight();
+
+                //// move up to level 2
+                //start_tracking_end = false;
+                //is_end = false;
+                //MoveUp();
+                //altitude = await GetAltitude();
+                //while (altitude <= 0.5)
+                //{
+                //    await Task.Delay(20);
+                //    altitude = await GetAltitude();
+                //}
+                //await Task.Delay(500);
+                //Stop();
+
+                //// move to left level 2
+                //await MoveDroneToLeft();
+
+                //// move up to level 3
+                //start_tracking_end = false;
+                //is_end = false;
+                //MoveUp();
+                //altitude = await GetAltitude();
+                //while (altitude <= 1.1)
+                //{
+                //    await Task.Delay(20);
+                //    altitude = await GetAltitude();
+                //}
+                //await Task.Delay(500);
+                //Stop();
+
+                //// move to right level 3
+                //await MoveDroneToRight();
+
+
+                //WriteToCsv(GetResultPairs());
+
+                //Landing();
+                //await Task.Delay(15000);
+                //altitude = await GetAltitude();
+                //while (altitude >= 0.1)
+                //{
+                //    CancelLanding();
+                //    MoveUp();
+                //    await Task.Delay(800);
+                //    Landing();
+                //    await Task.Delay(15000);
+                //    altitude = await GetAltitude();
+                //}
+
+            });
         }
 
         void createWorker()
@@ -290,6 +706,14 @@ namespace WSDKTest
                         // when the qr code detection result is not empty.
                         if (results != null && results.Length > 0)
                         {
+                            var average_len = QRCodeAverageLength(results);
+                            qr_len = average_len;
+
+                            if (start_tracking_end)
+                            {
+                                is_end = ProcessQRCode.DetectEnd(results);
+                            }
+
                             // cache locations and boxes
                             List<(string, (float, float))> location_list = new List<(string, (float, float))>();
                             List<(string, (float, float))> box_list = new List<(string, (float, float))>();
@@ -302,7 +726,7 @@ namespace WSDKTest
                                 {
                                     location_list.Add((result.Text, FindCentroid(result)));
                                 }
-                                else
+                                else if (ProcessQRCode.IsBox(result.Text))
                                 {
                                     box_list.Add((result.Text, FindCentroid(result)));
                                 }
@@ -450,46 +874,75 @@ namespace WSDKTest
                     //    bitmap.Dispose();
                     //}
 
-                    var altitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAltitudeAsync();
-                    if (altitude_result.value == null)
-                    {
-                        loop_info += "height: " + "null" + "\n";
-                    } else
-                    {
-                        loop_info += "height: " + altitude_result.value.Value.value + "\n";
-                    }
-
-                    var attitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAttitudeAsync();
-                    if (attitude_result.value == null)
-                    {
-                        loop_info += "attitude: " + "null" + "\n";
-                    } else
-                    {
-                        loop_info += "roll: " + attitude_result.value.Value.roll + "\n";
-                        loop_info += "pitch: " + attitude_result.value.Value.pitch + "\n";
-                        loop_info += "yaw: " + attitude_result.value.Value.yaw + "\n";
-                    }
-
-                    var flying = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetIsFlyingAsync();
-                    if (flying.value == null)
-                    {
-                        loop_info += "flying: " + "null" + "\n";
-                    }
-                    else
-                    {
-                        loop_info += "flying: " + flying.value.Value.value + "\n";
-                    }
-
+                    loop_info += await GetDroneInfoAsync();
+                    loop_info += "width, height: " + width + ", " + height + "\n";
 
                     // finish processing
                     watch.Stop();
                     int elapsed = (int)watch.ElapsedMilliseconds;
                     loop_info += "Time elapsed: " + elapsed + "\n";
+
+                    loop_info += "qr_len: " + qr_len+"\n";
+                    loop_info += "is_end: " + is_end + "\n";
                     RewriteTextbox(loop_info);
                     //run at max 5Hz
                     await Task.Delay(Math.Max(0, 100 - elapsed));
                 }
             });
+        }
+
+        private async Task<string> GetDroneInfoAsync()
+        {
+            var loop_info = "";
+            var altitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAltitudeAsync();
+            if (altitude_result.value == null)
+            {
+                loop_info += "height: " + "null" + "\n";
+            }
+            else
+            {
+                loop_info += "height: " + altitude_result.value.Value.value + "\n";
+            }
+
+            var attitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAttitudeAsync();
+            if (attitude_result.value == null)
+            {
+                loop_info += "attitude: " + "null" + "\n";
+            }
+            else
+            {
+                loop_info += "roll: " + attitude_result.value.Value.roll + "\n";
+                loop_info += "pitch: " + attitude_result.value.Value.pitch + "\n";
+                loop_info += "yaw: " + attitude_result.value.Value.yaw + "\n";
+            }
+
+            var flying = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetIsFlyingAsync();
+            if (flying.value == null)
+            {
+                loop_info += "flying: " + "null" + "\n";
+            }
+            else
+            {
+                loop_info += "flying: " + flying.value.Value.value + "\n";
+            }
+
+            //var resolu = await DJISDKManager.Instance.ComponentManager.GetCameraHandler(0, 0).GetVideoResolutionAndFrameRateAsync();
+            //if (resolu.value == null)
+            //{
+            //    loop_info += "resolution: " + "null" + "\n";
+            //}
+            //else
+            //{
+            //    loop_info += "resolution: " + resolu.value.Value.resolution.ToString() +", "+ resolu.value.Value.frameRate.ToString()+ "\n";
+            //    if (resolu.value.Value.resolution != VideoResolution.RESOLUTION_3840x2160)
+            //    {
+            //        var resolu_frame = new VideoResolutionAndFrameRate();
+            //        resolu_frame.resolution = VideoResolution.RESOLUTION_3840x2160;
+            //        resolu_frame.frameRate = VideoFrameRate.RATE_30FPS;
+            //        await DJISDKManager.Instance.ComponentManager.GetCameraHandler(0, 0).SetVideoResolutionAndFrameRateAsync(resolu_frame);
+            //    }
+            //}
+            return loop_info;
         }
 
         void createMyWorker()
@@ -710,6 +1163,230 @@ namespace WSDKTest
                 System.Diagnostics.Debug.WriteLine(err);
             }
         }
+        
+        private async void TakeOff()
+        {
+            await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).StartTakeoffAsync();
+        }
+
+
+        private async void Landing()
+        {
+            await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).StartAutoLandingAsync();
+        }
+
+
+        private async void CancelLanding()
+        {
+            await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).StopAutoLandingAsync();
+        }
+
+
+        private void MoveForward(float mag)
+        {
+            float throttle = 0;
+            float roll = 0;
+            float pitch = mag;
+            float yaw = 0;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+
+        private void MoveBackward(float mag)
+        {
+            float throttle = 0;
+            float roll = 0;
+            float pitch = -mag;
+            float yaw = 0;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+
+        private void MoveRight(float mag)
+        {
+            float throttle = 0;
+            float roll = mag;
+            float pitch = 0;
+            float yaw = 0;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+        private void MoveLeft(float mag)
+        {
+            float throttle = 0;
+            float roll = -mag;
+            float pitch = 0;
+            float yaw = 0;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+        private void MoveUp()
+        {
+            float throttle = 0.2f;
+            float roll = 0;
+            float pitch = 0;
+            float yaw = 0;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+        private void MoveDown()
+        {
+            float throttle = -0.5f;
+            float roll = 0;
+            float pitch = 0;
+            float yaw = 0;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+        private async void GimbalUp()
+        {
+            GimbalAngleRotation rotation = new GimbalAngleRotation()
+            {
+                mode = GimbalAngleRotationMode.RELATIVE_ANGLE,
+                pitch = 45,
+                roll = 45,
+                yaw = 45,
+                pitchIgnored = false,
+                yawIgnored = false,
+                rollIgnored = false,
+                duration = 0.5
+            };
+
+            System.Diagnostics.Debug.Write("pitch = 45\n");
+
+            // Defined somewhere else
+            var gimbalHandler = DJISDKManager.Instance.ComponentManager.GetGimbalHandler(0, 0);
+
+            //angle
+            //var gimbalRotation = new GimbalAngleRotation();
+            //gimbalRotation.pitch = 45;
+            //gimbalRotation.pitchIgnored = false;
+            //gimbalRotation.duration = 5;
+            //await gimbalHandler.RotateByAngleAsync(gimbalRotation);
+
+            //Speed
+            var gimbalRotation_speed = new GimbalSpeedRotation();
+            gimbalRotation_speed.pitch = 10;
+            await gimbalHandler.RotateBySpeedAsync(gimbalRotation_speed);
+        }
+
+        private async void GimbalDown()
+        {
+            GimbalAngleRotation rotation = new GimbalAngleRotation()
+            {
+                mode = GimbalAngleRotationMode.RELATIVE_ANGLE,
+                pitch = 45,
+                roll = 45,
+                yaw = 45,
+                pitchIgnored = false,
+                yawIgnored = false,
+                rollIgnored = false,
+                duration = 0.5
+            };
+
+            System.Diagnostics.Debug.Write("pitch = 45\n");
+
+            // Defined somewhere else
+            var gimbalHandler = DJISDKManager.Instance.ComponentManager.GetGimbalHandler(0, 0);
+
+            //Speed
+            var gimbalRotation_speed = new GimbalSpeedRotation();
+            gimbalRotation_speed.pitch = -10;
+            await gimbalHandler.RotateBySpeedAsync(gimbalRotation_speed);
+        }
+
+        private void TurnRight()
+        {
+            float throttle = 0;
+            float roll = 0;x
+            float pitch = 0;
+            float yaw = -0.3f;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+        private void Stop()
+        {
+            float throttle = 0;
+            float roll = 0;
+            float pitch = 0;
+            float yaw = 0;
+
+            try
+            {
+                if (DJISDKManager.Instance != null)
+                    DJISDKManager.Instance.VirtualRemoteController.UpdateJoystickValue(throttle, yaw, pitch, roll);
+            }
+            catch (Exception err)
+            {
+                System.Diagnostics.Debug.WriteLine(err);
+            }
+        }
+
+
+
 
         private float throttle = 0;
         private float roll = 0;
@@ -897,6 +1574,15 @@ namespace WSDKTest
 
                         //await DJISDKManager.Instance.ComponentManager.GetGimbalHandler(0,0).RotateByAngleAsync(rotation);
 
+                        break;
+                    }
+                case Windows.System.VirtualKey.B:
+                    {
+                        if (controlWorker == null)
+                        {
+                            createControlWorker();
+                            controlWorker.Start();
+                        }
                         break;
                     }
             }
