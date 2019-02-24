@@ -448,7 +448,7 @@ namespace WSDKTest
             Stop();
         }
 
-        int turn_ms = 2000;
+        int turn_ms = 3000;
 
         private float qr_len = 0;
         private bool is_end = false;
@@ -459,6 +459,7 @@ namespace WSDKTest
             controlWorker = new Task(async () =>
             {
                 TakeOff();
+                await Task.Delay(1000);
 
                 //// successfully take off
                 //var altitude = await GetAltitude();
@@ -1352,7 +1353,7 @@ namespace WSDKTest
         private void TurnRight()
         {
             float throttle = 0;
-            float roll = 0;x
+            float roll = 0;
             float pitch = 0;
             float yaw = -0.3f;
 
