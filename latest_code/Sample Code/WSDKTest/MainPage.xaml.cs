@@ -448,7 +448,7 @@ namespace WSDKTest
             Stop();
         }
 
-        int turn_ms = 3000;
+        int turn_ms = 14200;
 
         private float qr_len = 0;
         private bool is_end = false;
@@ -459,95 +459,95 @@ namespace WSDKTest
             controlWorker = new Task(async () =>
             {
                 TakeOff();
-                await Task.Delay(1000);
+                //await Task.Delay(7000);
 
-                //// successfully take off
-                //var altitude = await GetAltitude();
-                //while (altitude < 1.1)
-                //{
-                //    await Task.Delay(100);
-                //    altitude = await GetAltitude();
-                //}
-                //await Task.Delay(500);
-                
-                //// move forward a bit until ...
-                //var counter = 0;
-                //while (true)
-                //{
-                //    if ((qr_len < 60 && qr_len > 45) || counter>=100)
-                //    {
-                //        break;
-                //    }
-                //    else if (qr_len >= 60)
-                //    {
-                //        MoveBackward(0.2f);
-                //        await Task.Delay(20);
-                //    }
-                //    else
-                //    {
-                //        MoveForward(0.2f);
-                //        await Task.Delay(20);
-                //    }
-                //    counter++;
-                //}
-                //Stop();
+                // successfully take off
+                var altitude = await GetAltitude();
+                while (altitude < 1.1)
+                {
+                    await Task.Delay(100);
+                    altitude = await GetAltitude();
+                }
+                await Task.Delay(500);
 
-                //// move to right level 3
-                //await MoveDroneToRight();
+                // move forward a bit until ...
+                var counter = 0;
+                while (true)
+                {
+                    if ((qr_len < 60 && qr_len > 45) || counter >= 100)
+                    {
+                        break;
+                    }
+                    else if (qr_len >= 60)
+                    {
+                        MoveBackward(0.2f);
+                        await Task.Delay(20);
+                    }
+                    else
+                    {
+                        MoveForward(0.2f);
+                        await Task.Delay(20);
+                    }
+                    counter++;
+                }
+                Stop();
 
-                //// move down to level 2
-                //start_tracking_end = false;
-                //is_end = false;
-                //MoveDown();
-                //altitude = await GetAltitude();
-                //while (altitude > 0.8)
-                //{
-                //    await Task.Delay(20);
-                //    altitude = await GetAltitude();
-                //}
-                //Stop();
+                // move to right level 3
+                await MoveDroneToRight();
 
-                //// move to left level 2
-                //await MoveDroneToLeft();
+                // move down to level 2
+                start_tracking_end = false;
+                is_end = false;
+                MoveDown();
+                altitude = await GetAltitude();
+                while (altitude > 0.8)
+                {
+                    await Task.Delay(20);
+                    altitude = await GetAltitude();
+                }
+                Stop();
 
-                //// move down to level 1
-                //start_tracking_end = false;
-                //is_end = false;
-                //MoveDown();
-                //altitude = await GetAltitude();
-                //while (altitude >= 0.5)
-                //{
-                //    await Task.Delay(20);
-                //    altitude = await GetAltitude();
-                //}
-                //await Task.Delay(500);
-                //Stop();
+                // move to left level 2
+                await MoveDroneToLeft();
+
+                // move down to level 1
+                start_tracking_end = false;
+                is_end = false;
+                MoveDown();
+                altitude = await GetAltitude();
+                while (altitude >= 0.5)
+                {
+                    await Task.Delay(20);
+                    altitude = await GetAltitude();
+                }
+                await Task.Delay(500);
+                Stop();
 
 
-                //// move backward a bit until?
-                //counter = 0;
-                //while (true)
-                //{
-                //    if ((qr_len < 50 && qr_len > 45) || counter >= 100)
-                //    {
-                //        break;
-                //    }
-                //    else if (qr_len >= 50)
-                //    {
-                //        MoveBackward(0.2f);
-                //        await Task.Delay(50);
-                //    }
-                //    else
-                //    {
-                //        MoveForward(0.2f);
-                //        await Task.Delay(50);
-                //    }
-                //    counter++;
-                //}
-                //Stop();
+                // move backward a bit until?
+                counter = 0;
+                while (true)
+                {
+                    if ((qr_len < 50 && qr_len > 45) || counter >= 100)
+                    {
+                        break;
+                    }
+                    else if (qr_len >= 50)
+                    {
+                        MoveBackward(0.2f);
+                        await Task.Delay(50);
+                    }
+                    else
+                    {
+                        MoveForward(0.2f);
+                        await Task.Delay(50);
+                    }
+                    counter++;
+                }
+                Stop();
 
-                //// move to right level 1
-                //await MoveDroneToRight();
+                // move to right level 1
+                await MoveDroneToRight();
 
 
                 // rotate 180 degree
@@ -562,79 +562,79 @@ namespace WSDKTest
                 Stop();
                 await Task.Delay(100);
 
-                //// move forward a bit until ...
-                //qr_len = 0;
-                //counter = 0;
-                //while (true)
-                //{
-                //    if ((qr_len < 60 && qr_len > 45) || counter >= 130)
-                //    {
-                //        break;
-                //    }
-                //    else if (qr_len >= 60)
-                //    {
-                //        MoveBackward(0.2f);
-                //        await Task.Delay(20);
-                //    }
-                //    else
-                //    {
-                //        MoveForward(0.2f);
-                //        await Task.Delay(20);
-                //    }
-                //    counter++;
-                //}
-                //Stop();
+                // move forward a bit until ...
+                qr_len = 0;
+                counter = 0;
+                while (true)
+                {
+                    if ((qr_len < 60 && qr_len > 45) || counter >= 130)
+                    {
+                        break;
+                    }
+                    else if (qr_len >= 60)
+                    {
+                        MoveBackward(0.2f);
+                        await Task.Delay(20);
+                    }
+                    else
+                    {
+                        MoveForward(0.2f);
+                        await Task.Delay(20);
+                    }
+                    counter++;
+                }
+                Stop();
 
-                //// move to right level 1
-                //await MoveDroneToRight();
+                // move to right level 1
+                await MoveDroneToRight();
 
-                //// move up to level 2
-                //start_tracking_end = false;
-                //is_end = false;
-                //MoveUp();
-                //altitude = await GetAltitude();
-                //while (altitude <= 0.5)
-                //{
-                //    await Task.Delay(20);
-                //    altitude = await GetAltitude();
-                //}
-                //await Task.Delay(500);
-                //Stop();
+                // move up to level 2
+                start_tracking_end = false;
+                is_end = false;
+                MoveUp();
+                altitude = await GetAltitude();
+                while (altitude <= 0.5)
+                {
+                    await Task.Delay(20);
+                    altitude = await GetAltitude();
+                }
+                await Task.Delay(500);
+                Stop();
 
-                //// move to left level 2
-                //await MoveDroneToLeft();
+                // move to left level 2
+                await MoveDroneToLeft();
 
-                //// move up to level 3
-                //start_tracking_end = false;
-                //is_end = false;
-                //MoveUp();
-                //altitude = await GetAltitude();
-                //while (altitude <= 1.1)
-                //{
-                //    await Task.Delay(20);
-                //    altitude = await GetAltitude();
-                //}
-                //await Task.Delay(500);
-                //Stop();
+                // move up to level 3
+                start_tracking_end = false;
+                is_end = false;
+                MoveUp();
+                altitude = await GetAltitude();
+                while (altitude <= 1.1)
+                {
+                    await Task.Delay(20);
+                    altitude = await GetAltitude();
+                }
+                await Task.Delay(500);
+                Stop();
 
-                //// move to right level 3
-                //await MoveDroneToRight();
+                // move to right level 3
+                await MoveDroneToRight();
 
 
-                //WriteToCsv(GetResultPairs());
+                WriteToCsv(GetResultPairs());
 
-                //Landing();
-                //await Task.Delay(15000);
-                //altitude = await GetAltitude();
-                //while (altitude >= 0.1)
-                //{
-                //    CancelLanding();
-                //    MoveUp();
-                //    await Task.Delay(800);
-                //    Landing();
-                //    await Task.Delay(15000);
-                //    altitude = await GetAltitude();
-                //}
+                Landing();
+                await Task.Delay(15000);
+                altitude = await GetAltitude();
+                while (altitude >= 0.1)
+                {
+                    CancelLanding();
+                    MoveUp();
+                    await Task.Delay(800);
+                    Landing();
+                    await Task.Delay(15000);
+                    altitude = await GetAltitude();
+                }
 
             });
         }
