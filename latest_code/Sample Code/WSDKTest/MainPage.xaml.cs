@@ -165,63 +165,6 @@ namespace WSDKTest
             return (x, y);
         }   
 
-        // detect green lines from image
-        public List<double> getGreenLines(Mat img, int threshold, bool takeTopCluster)
-        {
-            var lowerBound = new OpenCvSharp.Scalar(40, 25, 25);
-            var upperBound = new OpenCvSharp.Scalar(80, 255, 255);
-            var hsv = img.CvtColor(ColorConversionCodes.BGR2HSV);
-            var mask = hsv.InRange(lowerBound, upperBound);
-            var invertMask = (255 - mask).ToMat();
-            var canny = invertMask.Canny(50, 150, 3);
-            var lines = Cv2.HoughLines(canny, 1, Math.PI / 180, 200);
-
-            double max_c = int.MinValue;
-            double min_c = int.MaxValue;
-            double mean_rho = 0;
-            double mean_theta = 0;
-
-            for(int i = 0; i < lines.Length; i++)
-            {
-                var rho = lines[i].Rho;
-                var theta = lines[i].Theta;
-                var c = rho / Math.Sin(theta);
-                max_c = Math.Max(max_c, c);
-                min_c = Math.Min(min_c, c);
-                mean_rho += rho;
-                mean_theta += theta;
-            }
-
-            if (max_c - min_c > threshold)
-            {
-                mean_rho = 0;
-                mean_theta = 0;
-                var mid_c = (max_c + min_c) / 2;
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    var rho = lines[i].Rho;
-                    var theta = lines[i].Theta;
-                    var c = rho / Math.Sin(theta);
-
-                    if(c > mid_c && takeTopCluster)
-                    {
-                        mean_rho += rho;
-                        mean_theta += theta;
-                    }
-                    else if(c < mid_c && !takeTopCluster)
-                    {
-                        mean_rho += rho;
-                        mean_theta += theta;
-                    }
-                }
-
-            }
-            mean_rho = mean_rho / lines.Length;
-            mean_theta = mean_theta / lines.Length;
-
-            return new List<double>(new double[] { mean_rho, mean_theta });
-        }
-
         void createWorker()
         {
             //create worker thread for reading barcode
@@ -263,8 +206,9 @@ namespace WSDKTest
                             //Invalidate cache and trigger redraw
                             VideoSource.Invalidate();
                         }
-                        catch (Exception)
+                        catch (Exception err)
                         {
+                            System.Diagnostics.Debug.WriteLine(err.ToString());
                         }
                     });
 
@@ -307,18 +251,6 @@ namespace WSDKTest
                                     box_list.Add((result.Text, FindCentroid(result)));
                                 }
                             }
-
-                            //loop_info += "box: \n";
-                            //foreach (var box in box_list)
-                            //{
-                            //    loop_info += box.Item1 + "\n";
-                            //}
-
-                            //loop_info += "loc: \n";
-                            //foreach (var loc in location_list)
-                            //{
-                            //    loop_info += loc.Item1 + "\n";
-                            //}
 
                             // make sure all locations are saved somewhere
                             foreach (var loc in location_list)
@@ -379,76 +311,15 @@ namespace WSDKTest
                                 }
                             }
 
-
-                            //// if there are any non location qr code, use distance to match which location associated with it
-                            //await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-                            //{
-                            //    foreach (var result in results)
-                            //    {
-                            //        if (!readed.Contains(result.Text))
-                            //        {
-                            //            readed.Add(result.Text);
-                            //            //Textbox.Text += result.Text + "\n";
-                            //        }
-                            //    }
-                            //});
                         }
 
                         loop_info += "pairing: \n";
                         loop_info += PrintPairDictionary();
                     }
-                    catch (Exception e)
+                    catch (Exception err)
                     {
-                        loop_info += e.ToString();
-                        ////the size maybe incorrect due to unknown reason
-                        //await Task.Delay(10);
-                        //continue;
+                        System.Diagnostics.Debug.WriteLine(err.ToString());
                     }
-
-                    //// object detection
-                    //try
-                    //{
-                    //    //UpdateTextbox("In ProcessSoftwareBitmap \n");
-
-                    //    if (bitmap.PixelHeight != bitmap.PixelWidth)
-                    //    {
-                    //        int destWidthAndHeight = 416;
-                    //        using (var resourceCreator = CanvasDevice.GetSharedDevice())
-                    //        using (var canvasBitmap = CanvasBitmap.CreateFromSoftwareBitmap(resourceCreator, bitmap))
-                    //        using (var canvasRenderTarget = new CanvasRenderTarget(resourceCreator, destWidthAndHeight, destWidthAndHeight, canvasBitmap.Dpi))
-                    //        using (var drawingSession = canvasRenderTarget.CreateDrawingSession())
-                    //        using (var scaleEffect = new ScaleEffect())
-                    //        {
-                    //            scaleEffect.Source = canvasBitmap;
-                    //            scaleEffect.Scale = new System.Numerics.Vector2((float)destWidthAndHeight / (float)bitmap.PixelWidth, (float)destWidthAndHeight / (float)bitmap.PixelHeight);
-                    //            drawingSession.DrawImage(scaleEffect);
-                    //            drawingSession.Flush();
-
-                    //            sbp = SoftwareBitmap.CreateCopyFromBuffer(canvasRenderTarget.GetPixelBytes().AsBuffer(), BitmapPixelFormat.Bgra8, destWidthAndHeight, destWidthAndHeight, BitmapAlphaMode.Premultiplied);
-
-                    //            var tempString = await processWithONNX.ProcessSoftwareBitmap(sbp, bitmap, this);
-                    //            UpdateTextbox(tempString);
-
-                    //        }
-                    //    }
-                    //    else
-                    //    {
-                    //        var tempString = await processWithONNX.ProcessSoftwareBitmap(bitmap, bitmap, this);
-                    //        UpdateTextbox(tempString);
-                    //    }
-
-                    //    UpdateTextbox("finished object detection.\n");
-                    //}
-                    //catch (Exception e)
-                    //{
-                    //    UpdateTextbox(e.ToString()+"\n");
-                    //    //string ss = e.Message;
-                    //    //await Task.Delay(1000);
-                    //}
-                    //finally
-                    //{
-                    //    bitmap.Dispose();
-                    //}
 
                     var altitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAltitudeAsync();
                     if (altitude_result.value == null)
@@ -550,8 +421,9 @@ namespace WSDKTest
                     fpvImage.Source = VideoSource;
                     VideoSource.Invalidate();
                 }
-                catch (Exception)
+                catch (Exception err)
                 {
+                    System.Diagnostics.Debug.WriteLine(err.ToString());
                 }
             }).AsTask();
         }
@@ -574,26 +446,11 @@ namespace WSDKTest
                             BitmapPixelFormat.Bgra8, (int)width, (int)height, BitmapAlphaMode.Premultiplied);
                     runProcessTask = ProcessSoftwareBitmap(bitmapToProcess);
                 }
-                catch (Exception e)
+                catch (Exception err)
                 {
-                    var dummy = "in DjiClient_Frame_Arrived \n";
+                    System.Diagnostics.Debug.WriteLine(err.ToString());
                 }
             }
-
-            //if (showVideoTask == null || showVideoTask.IsCompleted)
-            //{
-            //    // Do not forget to dispose it! In this sample, we dispose it in ProcessSoftwareBitmap
-            //    try
-            //    {
-
-            //        showVideoTask = DJIClient_ShowVideo(buffer, width, height);
-
-            //    }
-            //    catch (Exception e)
-            //    {
-            //        var dummy = "in DjiClient_Frame_Arrived \n";
-            //    }
-            //}
 
             await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
             {
@@ -609,8 +466,9 @@ namespace WSDKTest
                     fpvImage.Source = VideoSource;
                     VideoSource.Invalidate();
                 }
-                catch (Exception)
+                catch (Exception err)
                 {
+                    System.Diagnostics.Debug.WriteLine(err.ToString());
                 }
             });
         }
@@ -618,49 +476,7 @@ namespace WSDKTest
         // extra copy from microsoft UWPSample
         private async Task ProcessSoftwareBitmap(SoftwareBitmap bitmap)
         {
-            //try
-            //{
-            //    //UpdateTextbox("In ProcessSoftwareBitmap \n");
 
-            //    if (bitmap.PixelHeight != bitmap.PixelWidth)
-            //    {
-            //        int destWidthAndHeight = 416;
-            //        using (var resourceCreator = CanvasDevice.GetSharedDevice())
-            //        using (var canvasBitmap = CanvasBitmap.CreateFromSoftwareBitmap(resourceCreator, bitmap))
-            //        using (var canvasRenderTarget = new CanvasRenderTarget(resourceCreator, destWidthAndHeight, destWidthAndHeight, canvasBitmap.Dpi))
-            //        using (var drawingSession = canvasRenderTarget.CreateDrawingSession())
-            //        using (var scaleEffect = new ScaleEffect())
-            //        {
-            //            scaleEffect.Source = canvasBitmap;
-            //            scaleEffect.Scale = new System.Numerics.Vector2((float)destWidthAndHeight / (float)bitmap.PixelWidth, (float)destWidthAndHeight / (float)bitmap.PixelHeight);
-            //            drawingSession.DrawImage(scaleEffect);
-            //            drawingSession.Flush();
-
-            //            var sbp = SoftwareBitmap.CreateCopyFromBuffer(canvasRenderTarget.GetPixelBytes().AsBuffer(), BitmapPixelFormat.Bgra8, destWidthAndHeight, destWidthAndHeight, BitmapAlphaMode.Premultiplied);
-
-                        
-            //            var tempString = await processWithONNX.ProcessSoftwareBitmap(sbp, this);
-            //            UpdateTextbox(tempString);
-            //        }
-            //    }
-            //    else
-            //    {
-            //        var tempString = await processWithONNX.ProcessSoftwareBitmap(bitmap, this);
-            //        UpdateTextbox(tempString);
-            //    }
-
-
-
-            //}
-            //catch (Exception e)
-            //{
-            //    string ss = e.Message;
-            //    await Task.Delay(1000);
-            //}
-            //finally
-            //{
-            //    bitmap.Dispose();
-            //}
         }
 
         void ReceiveDecodedData(byte[] data, int width, int height)
@@ -855,13 +671,6 @@ namespace WSDKTest
                         // Defined somewhere else
                         var gimbalHandler = DJISDKManager.Instance.ComponentManager.GetGimbalHandler(0, 0);
 
-                        //angle
-                        //var gimbalRotation = new GimbalAngleRotation();
-                        //gimbalRotation.pitch = 45;
-                        //gimbalRotation.pitchIgnored = false;
-                        //gimbalRotation.duration = 5;
-                        //await gimbalHandler.RotateByAngleAsync(gimbalRotation);
-
                         //Speed
                         var gimbalRotation_speed = new GimbalSpeedRotation();
                         gimbalRotation_speed.pitch = 10;
@@ -908,7 +717,7 @@ namespace WSDKTest
             }
             catch(Exception err)
             {
-                System.Diagnostics.Debug.WriteLine(err);
+                System.Diagnostics.Debug.WriteLine(err.ToString());
             }
         }
 
@@ -921,9 +730,9 @@ namespace WSDKTest
                     NotifyPopup notifyPopup = new NotifyPopup(message);
                     notifyPopup.Show();
                 }
-                catch (Exception)
+                catch (Exception err)
                 {
-
+                    System.Diagnostics.Debug.WriteLine(err.ToString());
                 }
             });
         }
