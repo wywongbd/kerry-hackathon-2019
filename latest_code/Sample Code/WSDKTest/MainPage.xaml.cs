@@ -321,37 +321,6 @@ namespace WSDKTest
                         System.Diagnostics.Debug.WriteLine(err.ToString());
                     }
 
-                    var altitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAltitudeAsync();
-                    if (altitude_result.value == null)
-                    {
-                        loop_info += "height: " + "null" + "\n";
-                    } else
-                    {
-                        loop_info += "height: " + altitude_result.value.Value.value + "\n";
-                    }
-
-                    var attitude_result = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetAttitudeAsync();
-                    if (attitude_result.value == null)
-                    {
-                        loop_info += "attitude: " + "null" + "\n";
-                    } else
-                    {
-                        loop_info += "roll: " + attitude_result.value.Value.roll + "\n";
-                        loop_info += "pitch: " + attitude_result.value.Value.pitch + "\n";
-                        loop_info += "yaw: " + attitude_result.value.Value.yaw + "\n";
-                    }
-
-                    var flying = await DJISDKManager.Instance.ComponentManager.GetFlightControllerHandler(0, 0).GetIsFlyingAsync();
-                    if (flying.value == null)
-                    {
-                        loop_info += "flying: " + "null" + "\n";
-                    }
-                    else
-                    {
-                        loop_info += "flying: " + flying.value.Value.value + "\n";
-                    }
-
-
                     // finish processing
                     watch.Stop();
                     int elapsed = (int)watch.ElapsedMilliseconds;
